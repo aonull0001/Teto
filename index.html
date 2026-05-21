@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テトリス風ミニマルゲーム</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hud-bar">
+      <section class="score-panel" aria-label="現在スコア">
+        <p class="panel-label">現在スコア</p>
+        <p id="scoreValue" class="score-value">0</p>
+      </section>
+
+      <form id="speedForm" class="speed-form" aria-label="ゲームスピード">
+        <label class="speed-option">
+          <input type="radio" name="speedMode" value="fixed" checked>
+          <span>A</span>
+        </label>
+        <label class="speed-option">
+          <input type="radio" name="speedMode" value="gradual">
+          <span>B</span>
+        </label>
+        <label class="speed-option">
+          <input type="radio" name="speedMode" value="level">
+          <span>C</span>
+        </label>
+      </form>
+    </header>
+
+    <main class="play-layout">
+      <section id="boardSection" class="board-section">
+        <div id="boardFrame" class="board-frame">
+          <canvas id="boardCanvas" aria-label="ゲーム画面"></canvas>
+
+          <div id="startOverlay" class="overlay overlay-active">
+            <button id="startButton" class="action-button" type="button">開始</button>
+          </div>
+
+          <div id="gameOverOverlay" class="overlay" hidden>
+            <div class="result-panel">
+              <p class="result-line">【記録】</p>
+              <p id="finalScore" class="result-score">0点</p>
+              <p id="finalRank" class="result-line">ランク：D</p>
+              <button id="restartButton" class="action-button" type="button">もう一回プレイする</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="next-panel">
+        <p class="panel-label">次のブロック</p>
+        <div id="nextFrame" class="next-frame">
+          <canvas id="nextCanvas" aria-label="次のブロック"></canvas>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

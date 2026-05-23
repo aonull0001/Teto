@@ -11,35 +11,120 @@
 </head>
 <body>
   <div class="page-shell">
-    <header class="hud-bar">
-      <section class="score-panel" aria-label="現在スコア">
-        <p class="panel-label">現在スコア</p>
-        <p id="scoreValue" class="score-value">0</p>
-      </section>
+    <header class="top-bar">
+      <button id="logoButton" class="logo-button" type="button" aria-label="ござるさん線画ロゴ">
+        <span class="logo-frame"></span>
+        <span class="logo">
+          <span class="gz-head">
+            <span class="gz-band"></span>
+            <span class="gz-eye left"></span>
+            <span class="gz-eye right"></span>
+            <span class="gz-mouth"></span>
+          </span>
+          <span class="gz-body"></span>
+          <span class="gz-sword"></span>
+        </span>
+      </button>
 
-      <form id="speedForm" class="speed-form" aria-label="ゲームスピード">
-        <label class="speed-option">
-          <input type="radio" name="speedMode" value="fixed" checked>
-          <span>A</span>
-        </label>
-        <label class="speed-option">
-          <input type="radio" name="speedMode" value="gradual">
-          <span>B</span>
-        </label>
-        <label class="speed-option">
-          <input type="radio" name="speedMode" value="level">
-          <span>C</span>
-        </label>
-      </form>
+      <div class="top-main">
+        <section class="score-strip">
+          <div class="score-panel" aria-label="現在スコア">
+            <p class="panel-label">現在スコア</p>
+            <div class="score-row">
+              <p id="scoreValue" class="score-value">0</p>
+              <div class="best-score-box" aria-label="最高スコア">
+                <p class="mini-label">最高</p>
+                <p id="bestScoreValue" class="best-score-value">0</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="status-panel" aria-label="対戦情報">
+            <p class="panel-label">対戦情報</p>
+            <p id="statusValue" class="status-value">ひとり</p>
+          </div>
+        </section>
+
+        <section id="controlSection" class="control-section">
+          <div class="control-block">
+            <p class="control-label">モード</p>
+            <form id="modeForm" class="toggle-group" aria-label="モード">
+              <label class="toggle-option">
+                <input type="radio" name="playMode" value="solo" checked>
+                <span>ひとり</span>
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="playMode" value="cpu">
+                <span>CPU対戦</span>
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="playMode" value="online">
+                <span>オンライン対戦</span>
+              </label>
+            </form>
+          </div>
+
+          <div class="control-block">
+            <p class="control-label">ゲームスピード</p>
+            <form id="speedForm" class="toggle-group" aria-label="ゲームスピード">
+              <label class="toggle-option">
+                <input type="radio" name="speedMode" value="fixed" checked>
+                <span>固定スピード</span>
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="speedMode" value="gradual">
+                <span>徐々に速くなる</span>
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="speedMode" value="level">
+                <span>レベル制</span>
+              </label>
+            </form>
+          </div>
+
+          <div id="cpuOptions" class="control-block" hidden>
+            <label class="stack-field" for="cpuLevelSelect">
+              <span class="control-label">CPU強さ</span>
+              <select id="cpuLevelSelect" class="field-control">
+                <option value="lv1">Lv1</option>
+                <option value="lv2" selected>Lv2</option>
+                <option value="lv3">Lv3</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="onlineOptions" class="control-block" hidden>
+            <label class="stack-field" for="roomInput">
+              <span class="control-label">部屋名</span>
+              <input id="roomInput" class="field-control" type="text" inputmode="text" maxlength="24" autocomplete="off">
+            </label>
+          </div>
+        </section>
+      </div>
     </header>
 
-    <main class="play-layout">
+    <main id="playLayout" class="play-layout" data-mode="solo">
+      <aside id="opponentPanel" class="opponent-panel" hidden>
+        <p id="opponentHeading" class="panel-label">相手フィールド</p>
+        <div id="opponentFrame" class="opponent-frame">
+          <canvas id="opponentCanvas" aria-label="相手フィールド"></canvas>
+        </div>
+        <div class="opponent-meta">
+          <p id="opponentName" class="opponent-name">-</p>
+          <p id="opponentScore" class="opponent-score">0</p>
+          <p id="battleStatus" class="battle-status">-</p>
+        </div>
+      </aside>
+
       <section id="boardSection" class="board-section">
         <div id="boardFrame" class="board-frame">
           <canvas id="boardCanvas" aria-label="ゲーム画面"></canvas>
 
-          <div id="startOverlay" class="overlay overlay-active">
-            <button id="startButton" class="action-button" type="button">開始</button>
+          <div id="startOverlay" class="overlay">
+            <div class="start-panel">
+              <button id="startButton" class="action-button" type="button">開始</button>
+              <p id="startHint" class="start-hint"></p>
+            </div>
           </div>
 
           <div id="gameOverOverlay" class="overlay" hidden>

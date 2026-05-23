@@ -1,5 +1,6 @@
 const COLS = 10;
 const ROWS = 20;
+const FIXED_DROP_INTERVAL = 820;
 const PRACTICE_SEQUENCE = "aonull";
 const BEST_SCORE_KEY = "tetris-mini-best-score";
 const ONLINE_ROOM_KEY = "tetris-room-sync";
@@ -128,7 +129,6 @@ const elements = {
   statusValue: document.getElementById("statusValue"),
   controlSection: document.getElementById("controlSection"),
   modeForm: document.getElementById("modeForm"),
-  speedForm: document.getElementById("speedForm"),
   cpuOptions: document.getElementById("cpuOptions"),
   cpuLevelSelect: document.getElementById("cpuLevelSelect"),
   onlineOptions: document.getElementById("onlineOptions"),
@@ -156,12 +156,12 @@ const elements = {
 const app = {
   stage: "idle",
   mode: "solo",
-  speedMode: "fixed",
   cpuLevel: "lv2",
   practiceMode: false,
   secretArmed: false,
   secretBuffer: "",
   bestScore: loadBestScore(),
+  frameId: 0,
   layout: {
     boardCellSize: 28,
     nextCellSize: 24,
@@ -180,7 +180,7 @@ function init() {
   applyModeUi();
   resetToInitialState();
   updateBestScoreDisplay();
-  requestAnimationFrame(mainLoop);
+  startLoop();
 }
 
 function bindEvents() {
@@ -193,10 +193,6 @@ function bindEvents() {
     resetToInitialState();
   });
 
-  elements.speedForm.addEventListener("change", () => {
-    app.speedMode = getSelectedSpeedMode();
-  });
-
   elements.cpuLevelSelect.addEventListener("change", () => {
     app.cpuLevel = elements.cpuLevelSelect.value;
     updateStatusPanel();
@@ -205,9 +201,11 @@ function bindEvents() {
 
   elements.roomInput.addEventListener("input", () => {
     app.online.roomName = normalizeRoomName(elements.roomInput.value);
+
     if (app.stage === "idle" && app.online.transport && app.online.roomName !== app.online.connectedRoom) {
       teardownOnlineTransport(true);
     }
+
     updateStatusPanel();
     updateOpponentPanelText();
     updateStartHint();
@@ -217,7 +215,10 @@ function bindEvents() {
 
   window.addEventListener("keydown", handleKeydown, { passive: false });
   window.addEventListener("keyup", handleKeyup);
-  window.addEventListener("resize", resizeCanvases);
+  window.addEventListener("resize", () => {
+    resizeCanvases();
+    renderAll();
+  });
   window.addEventListener("beforeunload", () => {
     announceOnlineLeave();
     teardownOnlineTransport(false);
@@ -233,6 +234,19 @@ function bindEvents() {
     observer.observe(elements.nextFrame);
     observer.observe(elements.opponentFrame);
   }
+}
+
+function startLoop() {
+  if (app.frameId) {
+    return;
+  }
+
+  const tick = (timestamp) => {
+    app.frameId = requestAnimationFrame(tick);
+    mainLoop(timestamp);
+  };
+
+  app.frameId = requestAnimationFrame(tick);
 }
 
 function mainLoop(timestamp) {
@@ -251,7 +265,6 @@ function mainLoop(timestamp) {
   }
 
   renderAll();
-  requestAnimationFrame(mainLoop);
 }
 
 function handleStartButton() {
@@ -259,23 +272,25 @@ function handleStartButton() {
     return;
   }
 
-  app.speedMode = getSelectedSpeedMode();
+  resizeCanvases();
+  prepareMatch();
+  startLoop();
 
   if (app.mode === "solo") {
-    prepareMatch();
     app.stage = "running";
     startEngine(app.local, performance.now());
     syncUi();
+    renderAll();
     return;
   }
 
   if (app.mode === "cpu") {
-    prepareMatch();
     app.stage = "running";
     const now = performance.now();
     startEngine(app.local, now);
     startEngine(app.cpu, now);
     syncUi();
+    renderAll();
     return;
   }
 
@@ -289,7 +304,6 @@ function handleStartButton() {
   }
 
   ensureOnlineTransport(roomName);
-  prepareMatch();
   app.stage = "waiting";
   app.online.selfReady = true;
   app.online.waiting = true;
@@ -301,6 +315,7 @@ function handleStartButton() {
     ready: true
   });
   maybeScheduleOnlineStart();
+  renderAll();
 }
 
 function launchOnlineMatch(timestamp) {
@@ -336,7 +351,6 @@ function prepareMatch() {
 
 function resetToInitialState() {
   app.stage = "idle";
-  app.speedMode = getSelectedSpeedMode();
   app.cpuLevel = elements.cpuLevelSelect.value;
   app.online.roomName = normalizeRoomName(elements.roomInput.value);
   app.secretBuffer = "";
@@ -352,9 +366,11 @@ function resetToInitialState() {
   resetEngine(app.local);
   setupOpeningPieces(app.local, true);
   resetEngine(app.cpu);
+
   if (app.mode === "cpu") {
     setupOpeningPieces(app.cpu, false);
   }
+
   app.remote = createRemoteView();
 
   updateScoreDisplay();
@@ -368,12 +384,11 @@ function resetToInitialState() {
 }
 
 function syncUi() {
-  elements.controlSection.hidden = app.stage !== "idle";
   elements.startOverlay.hidden = app.stage === "running" || app.stage === "ended";
   elements.gameOverOverlay.hidden = app.stage !== "ended";
   elements.startButton.disabled = app.stage === "waiting";
   elements.playLayout.dataset.mode = app.mode;
-  elements.opponentPanel.hidden = app.mode === "solo";
+  elements.opponentPanel.classList.toggle("panel-empty", app.mode === "solo");
   updateStatusPanel();
   updateOpponentPanelText();
 }
@@ -395,7 +410,9 @@ function updateStatusPanel() {
     return;
   }
 
-  elements.statusValue.textContent = app.online.roomName ? `オンライン対戦 ${app.online.roomName}` : "オンライン対戦";
+  elements.statusValue.textContent = app.online.roomName
+    ? `オンライン対戦 ${app.online.roomName}`
+    : "オンライン対戦";
 }
 
 function updateOpponentPanelText() {
@@ -548,8 +565,7 @@ function updateEngine(engine, timestamp, isLocal) {
   const delta = timestamp - engine.lastTick;
   engine.lastTick = timestamp;
   engine.dropAccumulator += delta;
-
-  const interval = getDropInterval(engine, timestamp) / (isLocal && engine.softDropActive ? 8 : 1);
+  const interval = FIXED_DROP_INTERVAL / (isLocal && engine.softDropActive ? 8 : 1);
 
   while (engine.dropAccumulator >= interval && engine.running) {
     engine.dropAccumulator -= interval;
@@ -857,21 +873,6 @@ function finishMatch() {
   syncUi();
 }
 
-function getDropInterval(engine, timestamp) {
-  if (app.speedMode === "gradual") {
-    const elapsed = Math.max(0, timestamp - engine.startTime);
-    const tier = Math.floor(elapsed / 15000);
-    return Math.max(140, 820 - tier * 60);
-  }
-
-  if (app.speedMode === "level") {
-    const level = Math.floor(engine.totalLines / 10);
-    return Math.max(140, 820 - level * 70);
-  }
-
-  return 820;
-}
-
 function getLineScore(clearedLines, isLocal) {
   const base = SCORE_TABLE[clearedLines] ?? 0;
   return isLocal && app.practiceMode ? Math.floor(base / 2) : base;
@@ -1174,13 +1175,17 @@ function simulatePlacement(board, piece) {
   forEachFilledCell(piece.matrix, (x, y) => {
     const boardX = piece.x + x;
     const boardY = piece.y + y;
+
     if (boardY >= 0) {
       clonedBoard[boardY][boardX] = piece.type;
     }
   });
 
   const clearedLines = clearCompletedLines(clonedBoard);
-  return { board: clonedBoard, clearedLines };
+  return {
+    board: clonedBoard,
+    clearedLines
+  };
 }
 
 function evaluateBoard(board, clearedLines) {
@@ -1290,6 +1295,7 @@ function createLocalRoomTransport(roomName, onMessage) {
   return {
     send(message) {
       const payload = JSON.stringify(message);
+
       if (channel) {
         channel.postMessage(payload);
       }
@@ -1338,6 +1344,7 @@ function handleOnlineMessage(message) {
   if (message.type === "presence") {
     app.remote.connected = true;
     app.online.peerReady = Boolean(message.ready);
+
     if (!message.echo) {
       sendOnlineMessage({
         type: "presence",
@@ -1345,6 +1352,7 @@ function handleOnlineMessage(message) {
         echo: true
       });
     }
+
     maybeScheduleOnlineStart();
     updateStartHint();
     updateOpponentPanelText();
@@ -1385,6 +1393,7 @@ function handleOnlineMessage(message) {
   if (message.type === "gameover") {
     app.remote.connected = true;
     app.remote.gameOver = true;
+
     if (app.stage === "running") {
       finishMatch();
     } else {
@@ -1398,9 +1407,11 @@ function handleOnlineMessage(message) {
     app.online.peerReady = false;
     app.remote = createRemoteView();
     app.online.startAtUnix = 0;
+
     if (app.stage === "waiting") {
       updateStartHint();
     }
+
     updateOpponentPanelText();
   }
 }
@@ -1490,13 +1501,32 @@ function resizeCanvases() {
 }
 
 function renderAll() {
-  drawBoardView(boardContext, boardCanvas, app.local.board, app.stage === "running" ? app.local.currentPiece : null, app.layout.boardCellSize);
+  drawBoardView(
+    boardContext,
+    boardCanvas,
+    app.local.board,
+    app.stage === "running" ? app.local.currentPiece : null,
+    app.layout.boardCellSize
+  );
+
   drawNextView();
 
   if (app.mode === "cpu") {
-    drawBoardView(opponentContext, opponentCanvas, app.cpu.board, app.cpu.running ? app.cpu.currentPiece : null, app.layout.opponentCellSize);
+    drawBoardView(
+      opponentContext,
+      opponentCanvas,
+      app.cpu.board,
+      app.cpu.running ? app.cpu.currentPiece : null,
+      app.layout.opponentCellSize
+    );
   } else if (app.mode === "online") {
-    drawBoardView(opponentContext, opponentCanvas, app.remote.board, app.stage === "running" ? app.remote.currentPiece : null, app.layout.opponentCellSize);
+    drawBoardView(
+      opponentContext,
+      opponentCanvas,
+      app.remote.board,
+      app.stage === "running" ? app.remote.currentPiece : null,
+      app.layout.opponentCellSize
+    );
   } else {
     drawBoardView(opponentContext, opponentCanvas, createEmptyBoard(), null, app.layout.opponentCellSize);
   }
@@ -1504,7 +1534,7 @@ function renderAll() {
 
 function drawNextView() {
   nextContext.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  nextContext.fillStyle = "#09111f";
+  nextContext.fillStyle = "#0f172a";
   nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
   drawGrid(nextContext, nextCanvas.width, nextCanvas.height, app.layout.nextCellSize);
 
@@ -1524,7 +1554,7 @@ function drawNextView() {
 
 function drawBoardView(context, canvas, board, currentPiece, cellSize) {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#09111f";
+  context.fillStyle = "#0f172a";
   context.fillRect(0, 0, canvas.width, canvas.height);
   drawGrid(context, canvas.width, canvas.height, cellSize);
 
@@ -1535,7 +1565,7 @@ function drawBoardView(context, canvas, board, currentPiece, cellSize) {
         continue;
       }
 
-      const color = cell === "G" ? "#8a90a6" : COLORS[cell];
+      const color = cell === "G" ? "#9ca3af" : COLORS[cell];
       drawCell(context, col, row, color, cellSize);
     }
   }
@@ -1581,7 +1611,7 @@ function drawCell(context, x, y, color, cellSize) {
   context.fillStyle = "rgba(255, 255, 255, 0.22)";
   context.fillRect(px + 2, py + 2, Math.max(4, cellSize - 8), Math.max(3, cellSize * 0.16));
 
-  context.strokeStyle = "rgba(7, 10, 20, 0.42)";
+  context.strokeStyle = "rgba(0, 0, 0, 0.35)";
   context.lineWidth = 1;
   context.strokeRect(px + 1.5, py + 1.5, cellSize - 3, cellSize - 3);
 }
@@ -1635,11 +1665,6 @@ function saveBestScore(score) {
 function getSelectedMode() {
   const selected = elements.modeForm.querySelector("input[name='playMode']:checked");
   return selected ? selected.value : "solo";
-}
-
-function getSelectedSpeedMode() {
-  const selected = elements.speedForm.querySelector("input[name='speedMode']:checked");
-  return selected ? selected.value : "fixed";
 }
 
 function formatScore(value) {
